@@ -105,6 +105,49 @@ final class Order
             </form>
         </div>
     </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const itemsContainer = document.getElementById('items-container');
+            const items = <?php echo json_encode(getItems()); ?>;
+
+            items.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'item';
+                itemDiv.innerHTML = `
+            <h3>${item.name}</h3>
+            <img src="${item.image}" alt="${item.name}" style="width: 100px;">
+            <p>${item.description}</p>
+            <p>Price: ${item.price / 1e12} XMR</p>
+            <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
+                <input type="hidden" name="itemId" value="${index}">
+                <input type="submit" value="Buy">
+            </form>
+        `;
+                itemsContainer.appendChild(itemDiv);
+            });
+        });
+
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalPrompt = document.getElementById('modal-prompt');
+        const modalLabel = document.getElementById('modal-label');
+        const modalFormatted = document.getElementById('modal-formatted');
+        const modalAmount = document.getElementById('modal-amount');
+        const orderIdInput = document.querySelector('#modal form input[name=orderId]');
+        const modalClose = document.getElementById('modal-close');
+
+        const setModal = (orderId, title, prompt, label, formatted, amount, showClose) => {
+            modal.style.display = 'block';
+            modalTitle.innerText = title;
+            modalPrompt.innerText = prompt;
+            modalLabel.innerText = label;
+            modalFormatted.innerText = formatted;
+            modalAmount.innerText = amount;
+            orderIdInput.value = orderId;
+            modalClose.style.display = showClose ? 'block' : 'none';
+        };
+    </script>
 </body>
 </html>
 
@@ -154,5 +197,38 @@ function processOrder(int $itemId)
 
 function processPayment(string $orderId)
 {
+    
+    $state = get_server_state();
+    $order = null;
+
+    foreach ($state['orders'] as $o) {
+        if ($o['id'] === $orderId) {
+            $order = $o;
+            break;
+        }
+    }
+
+    if ($order === null) {
+        die("Invalid order ID $orderId");
+    }
+
+    $rpc = getRpc();
+    $rpc->openWallet("wallet", "123456");
+    $balance = $rpc->getBalance(0, [(int)$order['subaddressIndex']]);
+
+    $amount = $order['amount'];
+    if ($balance->balance < $amount) {
+        $formatted_amount = number_format($amount / 1e12, 12);
+        $formatted_paid = number_format($balance->balance / 1e12, 12);
+
+        die("
+            <script>
+                setModal('$orderId', 'Payment Failed', 'Insufficient balance. Please try again.', 'Amount Paid:', '$formatted_paid', '$formatted_amount', true);
+            </script>
+        ");
+    }
+
+    $state['orders'] = array_filter($state['orders'], fn ($o) => $o['id'] !== $orderId);
+    set_server_state($state);
 }
 ?>
