@@ -1,3 +1,19 @@
+<?php
+require_once __DIR__ . '/vendor/autoload.php';
+
+// this will be the db for now until i can set one up
+function get_server_state()
+{
+    $data = file_get_contents('./data.json');
+    return json_decode($data, true);
+}
+
+function set_server_state($state)
+{
+    file_put_contents('./data.json', json_encode($state, JSON_PRETTY_PRINT));
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -34,3 +50,28 @@
     </div>
 </body>
 </html>
+
+<?php
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    if (isset($_POST["itemId"]) && isset($_POST["orderId"])) {
+        die("Invalid request");
+    }
+
+    if (isset($_POST["itemId"])) {
+        processOrder($_POST["itemId"]);
+    } else if (isset($_POST["orderId"])) {
+        processPayment($_POST["orderId"]);
+    }
+
+    die();
+}
+
+// TODO: implement these functions
+function processOrder(int $itemId)
+{
+}
+
+function processPayment(string $orderId)
+{
+}
+?>
